@@ -127,6 +127,47 @@ mapping: dict[str, TuyaBLECategoryClimateMapping] = {
                     ),
                 ],
             ),
+            **dict.fromkeys(
+                [
+                "hkdvdvef",
+                ],  # BT Radiator Thermostat (SH1-BT)
+                [
+                # BT Radiator Thermostat
+                # - [x] 2   - Target temperature (temp_set)
+                # - [x] 3   - Current temperature (temp_current)
+                # - [x] 4   - Mode (auto/manual/holiday)
+                # - [x] 7   - Child lock
+                # - [ ] 13  - Fault status (bitmap)
+                # - [ ] 21  - Battery voltage
+                # - [ ] 101 - Comfort temperature
+                # - [ ] 102 - Eco temperature
+                # - [ ] 103 - Holiday configuration (raw)
+                # - [ ] 105 - Temperature calibration (temp_drift)
+                # - [ ] 107 - Auto mode temperature
+                # - [ ] 108 - Rapid mode
+                # - [x] 110 - Window detection status
+                # - [ ] 113 - Dormancy mode
+                # - [ ] 114-120 - Weekly schedule (raw)
+                # - [ ] 121 - Window temperature
+                # - [ ] 122 - Window time
+                # - [ ] 123 - Rapid duration
+                # - [x] 124 - Heating state
+                TuyaBLEClimateMapping(
+                    description=ClimateEntityDescription(
+                        key="bt_radiator_thermostat",
+                    ),
+                    hvac_mode_dp_id=4,
+                    hvac_modes=[HVACMode.AUTO, HVACMode.HEAT, HVACMode.OFF],  # auto, manual, holiday
+                    current_temperature_dp_id=3,
+                    current_temperature_coefficient=10.0,  # Device reports in 0.1°C units
+                    target_temperature_dp_id=2,
+                    target_temperature_coefficient=2.0,  # 0.5°C steps (step:5)
+                    target_temperature_step=0.5,
+                    target_temperature_min=0.5,  # min: 1 raw / 2 = 0.5°C
+                    target_temperature_max=29.5,  # max: 59 raw / 2 = 29.5°C
+                    ),
+                ],
+            ),
         },
     ),
 }
@@ -289,8 +330,8 @@ class TuyaBLEClimate(TuyaBLEEntity, ClimateEntity):
         ):
             int_value = self._mapping.hvac_modes.index(hvac_mode)
             datapoint = self._device.datapoints.get_or_create(
-                self._mapping.target_humidity_dp_id,
-                TuyaBLEDataPointType.DT_VALUE,
+                self._mapping.hvac_mode_dp_id,
+                TuyaBLEDataPointType.DT_ENUM,
                 int_value,
             )
             if datapoint:

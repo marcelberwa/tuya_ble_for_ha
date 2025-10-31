@@ -306,6 +306,32 @@ mapping: dict[str, TuyaBLECategorySensorMapping] = {
             ],
         },
     ),
+    "wk": TuyaBLECategorySensorMapping(
+        products={
+            "hkdvdvef": [  # BT Radiator Thermostat (SH1-BT)
+                TuyaBLESensorMapping(
+                    dp_id=21,
+                    description=SensorEntityDescription(
+                        key="battery_voltage",
+                        device_class=SensorDeviceClass.VOLTAGE,
+                        native_unit_of_measurement="V",
+                        entity_category=EntityCategory.DIAGNOSTIC,
+                        state_class=SensorStateClass.MEASUREMENT,
+                    ),
+                    coefficient=44.8,  # scale:2 with device correction factor (raw/100 * 2.24)
+                ),
+                TuyaBLESensorMapping(
+                    dp_id=124,
+                    description=SensorEntityDescription(
+                        key="heating_state",
+                        icon="mdi:radiator",
+                        device_class=SensorDeviceClass.ENUM,
+                        options=["off", "heating"],
+                    ),
+                ),
+            ],
+        },
+    ),
 }
 
 

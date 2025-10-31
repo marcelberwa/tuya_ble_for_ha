@@ -298,6 +298,40 @@ mapping: dict[str, TuyaBLECategorySwitchMapping] = {
                     ),
                 ],
             ),
+            "hkdvdvef": [  # BT Radiator Thermostat (SH1-BT)
+                TuyaBLESwitchMapping(
+                    dp_id=7,
+                    description=SwitchEntityDescription(
+                        key="child_lock",
+                        icon="mdi:account-lock",
+                        entity_category=EntityCategory.CONFIG,
+                    ),
+                ),
+                TuyaBLESwitchMapping(
+                    dp_id=110,
+                    description=SwitchEntityDescription(
+                        key="window_detection",
+                        icon="mdi:window-open-variant",
+                        entity_category=EntityCategory.CONFIG,
+                    ),
+                ),
+                TuyaBLESwitchMapping(
+                    dp_id=108,
+                    description=SwitchEntityDescription(
+                        key="rapid_mode",
+                        icon="mdi:fire",
+                        entity_category=EntityCategory.CONFIG,
+                    ),
+                ),
+                TuyaBLESwitchMapping(
+                    dp_id=113,
+                    description=SwitchEntityDescription(
+                        key="dormancy_mode",
+                        icon="mdi:sleep",
+                        entity_category=EntityCategory.CONFIG,
+                    ),
+                ),
+            ],
         },
     ),
     "wsdcg": TuyaBLECategorySwitchMapping(
