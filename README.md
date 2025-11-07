@@ -2,15 +2,14 @@
 
 ## Overview
 
-This integration supports Tuya devices connected via BLE.
+This integration supports Tuya devices connected via BLE and is an updated version of [@PlusPlus-ua].
 
+_Forked code of [@PlusPlus-ua](https://github.com/PlusPlus-ua/ha_tuya_ble)_
 _Inspired by code of [@redphx](https://github.com/redphx/poc-tuya-ble-fingerbot)_
 
 ## Installation
 
-Place the `custom_components` folder in your configuration directory (or add its contents to an existing `custom_components` folder). Alternatively install via [HACS](https://hacs.xyz/).
-
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=PlusPlus-ua&repository=ha_tuya_ble&category=integration)
+Place the `custom_components` folder in your configuration directory (or add its contents to an existing `custom_components` folder).
 
 ## Usage
 
@@ -40,7 +39,7 @@ The integration works locally, but connection to Tuya BLE device requires device
   + Smart Lock (product_id 'ludzroix', 'isk2p555').
 
 * Climate (category_id 'wk')
-  + Thermostatic Radiator Valve (product_ids 'drlajpqc', 'nhj2j7su').
+  + Thermostatic Radiator Valve (product_ids 'drlajpqc', 'nhj2j7su', 'hkdvdvef').
 
 * Smart water bottle (category_id 'znhsb')
   + Smart water bottle (product_id 'cdlandip')
@@ -53,6 +52,6 @@ The integration works locally, but connection to Tuya BLE device requires device
 I am working on this integration in Ukraine. Our country was subjected to brutal aggression by Russia. The war still continues. The capital of Ukraine - Kyiv, where I live, and many other cities and villages are constantly under threat of rocket attacks. Our air defense forces are doing wonders, but they also need support. So if you want to help the development of this integration, donate some money and I will spend it to support our air defense.
 <br><br>
 <p align="center">
-  <a href="https://www.buymeacoffee.com/3PaK6lXr4l"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy me an air defense"></a>
+  <a href="buymeacoffee.com/marcelberwa"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy me an Xilinx FPGA"></a>
 </p>
 
