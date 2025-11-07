@@ -1,4 +1,4 @@
-# Home Assistant support for Tuya BLE devices
+# Home Assistant support for Tuya Bluetooth devices
 
 ## Overview
 
