@@ -2,7 +2,7 @@
 
 ## Overview
 
-This integration supports Tuya devices connected via BLE and is an updated version of [@PlusPlus-ua].
+This integration supports Tuya devices connected via BLE and is an updated version of _[@PlusPlus-ua]_.
 
 _Forked code of [@PlusPlus-ua](https://github.com/PlusPlus-ua/ha_tuya_ble)_
 _Inspired by code of [@redphx](https://github.com/redphx/poc-tuya-ble-fingerbot)_
