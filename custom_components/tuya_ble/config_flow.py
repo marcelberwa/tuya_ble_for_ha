@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import logging
-import pycountry
 from typing import Any
 
 import voluptuous as vol
-from tuya_iot import AuthType
 
 from homeassistant.config_entries import (
     ConfigEntry,
@@ -22,17 +20,16 @@ from homeassistant.const import CONF_ADDRESS
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowHandler, FlowResult
 
-from homeassistant.components.tuya.const import (
+from .const import (
     CONF_ACCESS_ID,
     CONF_ACCESS_SECRET,
     CONF_APP_TYPE,
-    CONF_AUTH_TYPE,
-    CONF_COUNTRY_CODE,
+    CONF_DEVICE_NAME,
     CONF_ENDPOINT,
-    CONF_PASSWORD,
-    CONF_USERNAME,
+    CONF_REGION,
+    CONF_TUYA_DEVICE_ID,
     SMARTLIFE_APP,
-    TUYA_COUNTRIES,
+    TUYA_REGIONS,
     TUYA_RESPONSE_CODE,
     TUYA_RESPONSE_MSG,
     TUYA_RESPONSE_SUCCESS,
@@ -45,7 +42,7 @@ from .const import (
     DOMAIN,
 )
 from .devices import TuyaBLEData, get_device_readable_name
-from .cloud import HASSTuyaBLEDeviceManager
+from .cloud import HASSTuyaBLEDeviceManager, _cache
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,33 +56,17 @@ async def _try_login(
     response: dict[Any, Any] | None
     data: dict[str, Any]
 
-    country = [
-        country
-        for country in TUYA_COUNTRIES
-        if country.name == user_input[CONF_COUNTRY_CODE]
-    ][0]
-
     data = {
-        CONF_ENDPOINT: country.endpoint,
-        CONF_AUTH_TYPE: AuthType.CUSTOM,
         CONF_ACCESS_ID: user_input[CONF_ACCESS_ID],
         CONF_ACCESS_SECRET: user_input[CONF_ACCESS_SECRET],
-        CONF_USERNAME: user_input[CONF_USERNAME],
-        CONF_PASSWORD: user_input[CONF_PASSWORD],
-        CONF_COUNTRY_CODE: country.country_code,
+        CONF_TUYA_DEVICE_ID: user_input[CONF_TUYA_DEVICE_ID],
+        CONF_REGION: user_input[CONF_REGION],
     }
 
-    for app_type in (TUYA_SMART_APP, SMARTLIFE_APP, ""):
-        data[CONF_APP_TYPE] = app_type
-        if app_type == "":
-            data[CONF_AUTH_TYPE] = AuthType.CUSTOM
-        else:
-            data[CONF_AUTH_TYPE] = AuthType.SMART_HOME
+    response = await manager._login(data, True)
 
-        response = await manager._login(data, True)
-
-        if response.get(TUYA_RESPONSE_SUCCESS, False):
-            return data
+    if response.get(TUYA_RESPONSE_SUCCESS, False):
+        return data
 
     errors["base"] = "login_error"
     if response:
@@ -106,31 +87,11 @@ def _show_login_form(
     placeholders: dict[str, Any],
 ) -> FlowResult:
     """Shows the Tuya IOT platform login form."""
-    if user_input is not None and user_input.get(CONF_COUNTRY_CODE) is not None:
-        for country in TUYA_COUNTRIES:
-            if country.country_code == user_input[CONF_COUNTRY_CODE]:
-                user_input[CONF_COUNTRY_CODE] = country.name
-                break
-
-    def_country_name: str | None = None
-    try:
-        def_country = pycountry.countries.get(alpha_2=flow.hass.config.country)
-        if def_country:
-            def_country_name = def_country.name
-    except:
-        pass
-
+    
     return flow.async_show_form(
         step_id="login",
         data_schema=vol.Schema(
             {
-                vol.Required(
-                    CONF_COUNTRY_CODE,
-                    default=user_input.get(CONF_COUNTRY_CODE, def_country_name),
-                ): vol.In(
-                    # We don't pass a dict {code:name} because country codes can be duplicate.
-                    [country.name for country in TUYA_COUNTRIES]
-                ),
                 vol.Required(
                     CONF_ACCESS_ID, default=user_input.get(CONF_ACCESS_ID, "")
                 ): str,
@@ -139,11 +100,16 @@ def _show_login_form(
                     default=user_input.get(CONF_ACCESS_SECRET, ""),
                 ): str,
                 vol.Required(
-                    CONF_USERNAME, default=user_input.get(CONF_USERNAME, "")
+                    CONF_TUYA_DEVICE_ID,
+                    default=user_input.get(CONF_TUYA_DEVICE_ID, ""),
                 ): str,
                 vol.Required(
-                    CONF_PASSWORD, default=user_input.get(CONF_PASSWORD, "")
-                ): str,
+                    CONF_REGION,
+                    default=user_input.get(CONF_REGION, "eu"),
+                ): vol.In(
+                    # Region selector for Tuya Cloud access
+                    [region.code for region in TUYA_REGIONS]
+                ),
             }
         ),
         errors=errors,
@@ -262,6 +228,15 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             if data:
                 self._data.update(data)
+                # Populate the device cache with the new login data
+                await self._manager._login(data, True)
+                # Force cache population for the new credentials
+                global _cache
+                cache_key = self._manager._get_cache_key(data)
+                cache_item = _cache.get(cache_key)
+                if cache_item and len(cache_item.credentials) == 0:
+                    await self._manager._fill_cache_item(cache_item)
+                
                 return await self.async_step_device()
 
         if user_input is None:
@@ -287,6 +262,25 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             address = user_input[CONF_ADDRESS]
+            
+            # Handle manual MAC entry selection
+            if address == "manual":
+                return await self.async_step_manual_mac()
+            
+            # Check if it's a manual MAC address entry
+            if address not in self._discovered_devices:
+                # Validate MAC address format
+                import re
+                if not re.match(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$', address):
+                    errors["base"] = "invalid_mac_address"
+                    return await self._show_device_form(errors)
+                # Create a fake discovery info for manual entry
+                self._discovered_devices[address] = type('obj', (object,), {
+                    'address': address,
+                    'name': f'Manual Entry ({address})',
+                    'rssi': None,
+                })()
+
             discovery_info = self._discovered_devices[address]
             local_name = await get_device_readable_name(discovery_info, self._manager)
             await self.async_set_unique_id(
@@ -307,28 +301,96 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
                     options=self._data,
                 )
 
-        if discovery := self._discovery_info:
-            self._discovered_devices[discovery.address] = discovery
-        else:
-            current_addresses = self._async_current_ids()
-            for discovery in async_discovered_service_info(self.hass):
-                if (
-                    discovery.address in current_addresses
-                    or discovery.address in self._discovered_devices
-                    or discovery.service_data is None
-                    or not SERVICE_UUID in discovery.service_data.keys()
-                ):
-                    continue
-                self._discovered_devices[discovery.address] = discovery
+        # Perform enhanced device discovery
+        await self._perform_enhanced_discovery()
 
         if not self._discovered_devices:
             return self.async_abort(reason="no_unconfigured_devices")
 
-        def_address: str
-        if user_input:
-            def_address = user_input.get(CONF_ADDRESS)
-        else:
+        return await self._show_device_form(errors)
+
+    async def _perform_enhanced_discovery(self) -> None:
+        """Perform enhanced device discovery with multiple attempts and active scanning."""
+        import asyncio
+
+        current_addresses = self._async_current_ids()
+
+        # First attempt: Check already discovered devices
+        for discovery in async_discovered_service_info(self.hass):
+            if (
+                discovery.address in current_addresses
+                or discovery.address in self._discovered_devices
+                or discovery.service_data is None
+                or not SERVICE_UUID in discovery.service_data.keys()
+            ):
+                continue
+            self._discovered_devices[discovery.address] = discovery
+
+        # If we have devices, return early
+        if self._discovered_devices:
+            return
+
+        # Second attempt: Wait and scan again (allows for intermittent advertising)
+        await asyncio.sleep(3)
+        for discovery in async_discovered_service_info(self.hass):
+            if (
+                discovery.address in current_addresses
+                or discovery.address in self._discovered_devices
+                or discovery.service_data is None
+                or not SERVICE_UUID in discovery.service_data.keys()
+            ):
+                continue
+            self._discovered_devices[discovery.address] = discovery
+
+        # If we still have devices, return
+        if self._discovered_devices:
+            return
+
+        # Third attempt: Wait longer and scan again
+        await asyncio.sleep(5)
+        for discovery in async_discovered_service_info(self.hass):
+            if (
+                discovery.address in current_addresses
+                or discovery.address in self._discovered_devices
+                or discovery.service_data is None
+                or not SERVICE_UUID in discovery.service_data.keys()
+            ):
+                continue
+            self._discovered_devices[discovery.address] = discovery
+
+        # Final fallback: Check cloud cache for registered devices
+        if not self._discovered_devices and self._manager:
+            from .cloud import _cache
+            for cache_item in _cache.values():
+                if cache_item.credentials:
+                    # Add cloud devices to discovered devices list
+                    for mac_address, device_data in cache_item.credentials.items():
+                        if mac_address not in current_addresses:
+                            # Create a fake discovery info for cloud devices
+                            # This allows users to configure cloud-registered devices
+                            # even if they're not currently discoverable via Bluetooth
+                            self._discovered_devices[mac_address] = type('obj', (object,), {
+                                'address': mac_address,
+                                'name': device_data.get(CONF_DEVICE_NAME, 'Unknown Device'),
+                                'rssi': None,
+                            })()
+
+    async def _show_device_form(self, errors: dict[str, str]) -> FlowResult:
+        """Show the device selection form with manual MAC entry option."""
+        def_address: str = ""
+        if self._discovered_devices:
             def_address = list(self._discovered_devices)[0]
+
+        # Create options dict with discovered devices
+        device_options = {}
+        for service_info in self._discovered_devices.values():
+            device_options[service_info.address] = await get_device_readable_name(
+                service_info,
+                self._manager,
+            )
+
+        # Add manual entry option
+        device_options["manual"] = "Enter MAC address manually"
 
         return self.async_show_form(
             step_id="device",
@@ -337,18 +399,48 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(
                         CONF_ADDRESS,
                         default=def_address,
-                    ): vol.In(
-                        {
-                            service_info.address: await get_device_readable_name(
-                                service_info,
-                                self._manager,
-                            )
-                            for service_info in self._discovered_devices.values()
-                        }
-                    ),
+                    ): vol.In(device_options),
                 },
             ),
             errors=errors,
+            description_placeholders={
+                "scan_status": "Scanning for Tuya BLE devices... Please ensure your devices are powered on and in pairing mode."
+            },
+        )
+
+    async def async_step_manual_mac(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle manual MAC address entry."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            address = user_input[CONF_ADDRESS].upper()
+            # Validate MAC address format
+            import re
+            if not re.match(r'^([0-9A-F]{2}[:-]){5}([0-9A-F]{2})$', address):
+                errors["base"] = "invalid_mac_address"
+            else:
+                # Create a fake discovery info for manual entry
+                self._discovered_devices[address] = type('obj', (object,), {
+                    'address': address,
+                    'name': f'Manual Entry ({address})',
+                    'rssi': None,
+                })()
+                # Proceed to device selection with the manual entry
+                return await self.async_step_device({CONF_ADDRESS: address})
+
+        return self.async_show_form(
+            step_id="manual_mac",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_ADDRESS): str,
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "instructions": "Enter the MAC address of your Tuya BLE device (format: AA:BB:CC:DD:EE:FF)"
+            },
         )
 
     @staticmethod

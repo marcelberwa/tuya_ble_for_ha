@@ -9,16 +9,13 @@ from typing import Any, Iterable
 
 from homeassistant.const import CONF_ADDRESS, CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant
-from homeassistant.components.tuya.const import (
+from .const import (
     CONF_ACCESS_ID,
     CONF_ACCESS_SECRET,
     CONF_APP_TYPE,
-    CONF_AUTH_TYPE,
-    CONF_COUNTRY_CODE,
-    CONF_ENDPOINT,
-    CONF_PASSWORD,
-    CONF_USERNAME,
-    DOMAIN as TUYA_DOMAIN,
+    CONF_REGION,
+    CONF_TUYA_DEVICE_ID,
+    TUYA_DOMAIN,
     TUYA_RESPONSE_RESULT,
     TUYA_RESPONSE_SUCCESS,
 )
@@ -28,12 +25,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from tuya_iot import (
-    TuyaOpenAPI,
-    AuthType,
-    TuyaOpenMQ,
-    TuyaDeviceManager,
-)
+from .tuya_cloud_api import TuyaCloudAPI
 
 from .tuya_ble import (
     AbstaractTuyaBLEDeviceManager,
@@ -60,20 +52,16 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class TuyaCloudCacheItem:
-    api: TuyaOpenAPI | None
+    api: TuyaCloudAPI | None
     login: dict[str, Any]
     credentials: dict[str, dict[str, Any]]
 
 
 CONF_TUYA_LOGIN_KEYS = [
-    CONF_ENDPOINT,
     CONF_ACCESS_ID,
     CONF_ACCESS_SECRET,
-    CONF_AUTH_TYPE,
-    CONF_USERNAME,
-    CONF_PASSWORD,
-    CONF_COUNTRY_CODE,
-    CONF_APP_TYPE,
+    CONF_TUYA_DEVICE_ID,
+    CONF_REGION,
 ]
 
 CONF_TUYA_DEVICE_KEYS = [
@@ -128,35 +116,58 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
         if len(data) == 0:
             return {}
 
-        api = TuyaOpenAPI(
-            endpoint=data.get(CONF_ENDPOINT, ""),
-            access_id=data.get(CONF_ACCESS_ID, ""),
-            access_secret=data.get(CONF_ACCESS_SECRET, ""),
-            auth_type=data.get(CONF_AUTH_TYPE, ""),
-        )
-        api.set_dev_channel("hass")
-
-        response = await self._hass.async_add_executor_job(
-            api.connect,
-            data.get(CONF_USERNAME, ""),
-            data.get(CONF_PASSWORD, ""),
-            data.get(CONF_COUNTRY_CODE, ""),
-            data.get(CONF_APP_TYPE, ""),
-        )
-
-        if self._is_login_success(response):
-            _LOGGER.debug("Successful login for %s", data[CONF_USERNAME])
-            if add_to_cache:
-                auth_type = data[CONF_AUTH_TYPE]
-                if type(auth_type) is AuthType:
-                    data[CONF_AUTH_TYPE] = auth_type.value
-                cache_key = self._get_cache_key(data)
-                cache_item = _cache.get(cache_key)
-                if cache_item:
-                    cache_item.api = api
-                    cache_item.login = data
-                else:
-                    _cache[cache_key] = TuyaCloudCacheItem(api, data, {})
+        try:
+            # Create TuyaCloudAPI instance - this is async now
+            region = data.get(CONF_REGION, "eu")
+            api = TuyaCloudAPI(
+                api_region=region,
+                api_key=data.get(CONF_ACCESS_ID, ""),
+                api_secret=data.get(CONF_ACCESS_SECRET, ""),
+                api_device_id=data.get(CONF_TUYA_DEVICE_ID, ""),
+            )
+            
+            # Get token to verify authentication
+            token = await api.get_token()
+            
+            _LOGGER.debug("TuyaCloudAPI created - token: %s, error: %s", 
+                         bool(token), api.error)
+            
+            # Check if authentication was successful by checking if we have a token
+            if token:
+                response = {TUYA_RESPONSE_SUCCESS: True, "result": {"access_token": token}}
+                _LOGGER.debug("Successful login for API Key %s", data[CONF_ACCESS_ID][:8] + "...")
+                
+                if add_to_cache:
+                    cache_key = self._get_cache_key(data)
+                    cache_item = _cache.get(cache_key)
+                    if cache_item:
+                        cache_item.api = api
+                        cache_item.login = data
+                    else:
+                        _cache[cache_key] = TuyaCloudCacheItem(api, data, {})
+            else:
+                error_msg = "Authentication failed"
+                error_code = None
+                if api.error:
+                    if isinstance(api.error, dict):
+                        error_msg = api.error.get('msg', str(api.error))
+                        error_code = api.error.get('code', None)
+                    else:
+                        error_msg = str(api.error)
+                _LOGGER.error("TuyaCloudAPI authentication failed: %s", error_msg)
+                response = {
+                    TUYA_RESPONSE_SUCCESS: False, 
+                    "msg": error_msg,
+                    "code": error_code
+                }
+                
+        except Exception as e:
+            _LOGGER.error("Login failed with exception: %s", str(e))
+            response = {
+                TUYA_RESPONSE_SUCCESS: False, 
+                "msg": str(e),
+                "code": None
+            }
 
         return response
 
@@ -168,37 +179,44 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
         return await self._login(self._data, add_to_cache)
 
     async def _fill_cache_item(self, item: TuyaCloudCacheItem) -> None:
-        devices_response = await self._hass.async_add_executor_job(
-            item.api.get,
-            TUYA_API_DEVICES_URL % (item.api.token_info.uid),
-        )
-        if devices_response.get(TUYA_RESPONSE_SUCCESS):
-            devices = devices_response.get(TUYA_RESPONSE_RESULT)
-            if isinstance(devices, Iterable):
-                for device in devices:
-                    fi_response = await self._hass.async_add_executor_job(
-                        item.api.get,
-                        TUYA_API_FACTORY_INFO_URL % (device.get("id")),
-                    )
-                    fi_response_result = fi_response.get(TUYA_RESPONSE_RESULT)
-                    if fi_response_result and len(fi_response_result) > 0:
-                        factory_info = fi_response_result[0]
-                        if factory_info and (TUYA_FACTORY_INFO_MAC in factory_info):
-                            mac = ":".join(
-                                factory_info[TUYA_FACTORY_INFO_MAC][i : i + 2]
-                                for i in range(0, 12, 2)
-                            ).upper()
-                            item.credentials[mac] = {
-                                CONF_ADDRESS: mac,
-                                CONF_UUID: device.get("uuid"),
-                                CONF_LOCAL_KEY: device.get("local_key"),
-                                CONF_DEVICE_ID: device.get("id"),
-                                CONF_CATEGORY: device.get("category"),
-                                CONF_PRODUCT_ID: device.get("product_id"),
-                                CONF_DEVICE_NAME: device.get("name"),
-                                CONF_PRODUCT_MODEL: device.get("model"),
-                                CONF_PRODUCT_NAME: device.get("product_name"),
-                            }
+        try:
+            # Use our async API to get devices
+            devices_response = await item.api.get_devices()
+            
+            if devices_response.get(TUYA_RESPONSE_SUCCESS):
+                devices = devices_response.get(TUYA_RESPONSE_RESULT, [])
+                if isinstance(devices, Iterable):
+                    for device in devices:
+                        device_id = device.get("id")
+                        if device_id:
+                            # Get factory info using cloud_request
+                            fi_response = await item.api.cloud_request(
+                                TUYA_API_FACTORY_INFO_URL % device_id,
+                                method="GET"
+                            )
+                            
+                            if fi_response and fi_response.get(TUYA_RESPONSE_SUCCESS):
+                                fi_response_result = fi_response.get(TUYA_RESPONSE_RESULT)
+                                if fi_response_result and len(fi_response_result) > 0:
+                                    factory_info = fi_response_result[0]
+                                    if factory_info and (TUYA_FACTORY_INFO_MAC in factory_info):
+                                        mac = ":".join(
+                                            factory_info[TUYA_FACTORY_INFO_MAC][i : i + 2]
+                                            for i in range(0, 12, 2)
+                                        ).upper()
+                                        item.credentials[mac] = {
+                                            CONF_ADDRESS: mac,
+                                            CONF_UUID: device.get("uuid"),
+                                            CONF_LOCAL_KEY: device.get("local_key"),
+                                            CONF_DEVICE_ID: device.get("id"),
+                                            CONF_CATEGORY: device.get("category"),
+                                            CONF_PRODUCT_ID: device.get("product_id"),
+                                            CONF_DEVICE_NAME: device.get("name"),
+                                            CONF_PRODUCT_MODEL: device.get("model"),
+                                            CONF_PRODUCT_NAME: device.get("product_name"),
+                                        }
+        except Exception as e:
+            _LOGGER.error("Failed to fill cache item: %s", str(e))
 
     async def build_cache(self) -> None:
         global _cache
