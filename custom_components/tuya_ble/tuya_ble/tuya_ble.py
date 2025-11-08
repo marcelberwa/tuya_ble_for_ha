@@ -18,6 +18,8 @@ from bleak_retry_connector import (
     BleakError,
     BleakNotFoundError,
     establish_connection,
+    retry_bluetooth_connection_error,
+    DEFAULT_ATTEMPTS,
 )
 from Crypto.Cipher import AES
 
@@ -203,9 +205,6 @@ class TuyaBLEDataPoints:
             self._updated_datapoints.append(dp_id)
         else:
             await self._owner._send_datapoints([dp_id])
-
-
-global_connect_lock = asyncio.Lock()
 
 
 class TuyaBLEDevice:
@@ -539,9 +538,9 @@ class TuyaBLEDevice:
 
     async def _ensure_connected(self) -> None:
         """Ensure connection to device is established."""
-        global global_connect_lock
         if self._expected_disconnect:
             return
+            
         if self._connect_lock.locked():
             _LOGGER.debug(
                 "%s: Connection already in progress,"
@@ -549,130 +548,61 @@ class TuyaBLEDevice:
                 self.address,
                 self.rssi,
             )
-        if self._client and self._client.is_connected and self._is_paired:
-            return
+        
+        if self._client and self._client.is_connected:
+            return  # Already connected
+            
         async with self._connect_lock:
             # Check again while holding the lock
-            await asyncio.sleep(0.01)
-            if self._client and self._client.is_connected and self._is_paired:
+            if self._client and self._client.is_connected:
                 return
-            attempts_count = 100
-            while attempts_count > 0:
-                attempts_count -= 1
-                if attempts_count == 0:
-                    _LOGGER.error(
-                        "%s: Connecting, all attempts failed; RSSI: %s",
-                        self.address,
-                        self.rssi,
-                    )
-                    raise BleakNotFoundError()
-                try:
-                    async with global_connect_lock:
-                        _LOGGER.debug(
-                            "%s: Connecting; RSSI: %s", self.address, self.rssi
-                        )
-                        client = await establish_connection(
-                            BleakClientWithServiceCache,
-                            self._ble_device,
-                            self.address,
-                            self._disconnected,
-                            use_services_cache=True,
-                            ble_device_callback=lambda: self._ble_device,
-                        )
-                except BleakNotFoundError:
-                    _LOGGER.error(
-                        "%s: device not found, not in range, or poor RSSI: %s",
-                        self.address,
-                        self.rssi,
-                        exc_info=True,
-                    )
-                    continue
-                except BLEAK_EXCEPTIONS:
-                    _LOGGER.debug(
-                        "%s: communication failed", self.address, exc_info=True
-                    )
-                    continue
-                except:
-                    _LOGGER.debug("%s: unexpected error",
-                                  self.address, exc_info=True)
-                    continue
+                
+            _LOGGER.debug("%s: Connecting; RSSI: %s", self.address, self.rssi)
+            
+            try:
+                client = await establish_connection(
+                    BleakClientWithServiceCache,
+                    self._ble_device,
+                    self.address,
+                    self._disconnected,
+                    use_services_cache=True,
+                    ble_device_callback=lambda: self._ble_device,
+                )
+            except BleakNotFoundError:
+                _LOGGER.error(
+                    "%s: device not found, no longer in range, or poor RSSI: %s",
+                    self.address,
+                    self.rssi,
+                )
+                raise
+            except BLEAK_EXCEPTIONS:
+                _LOGGER.debug("%s: communication failed", self.address, exc_info=True)
+                raise
 
-                if client and client.is_connected:
-                    _LOGGER.debug("%s: Connected; RSSI: %s",
-                                  self.address, self.rssi)
-                    self._client = client
-                    try:
-                        await self._client.start_notify(
-                            CHARACTERISTIC_NOTIFY, self._notification_handler
-                        )
-                    except:  # [BLEAK_EXCEPTIONS, BleakNotFoundError]:
-                        self._client = None
-                        _LOGGER.error("%s: starting notifications failed",
-                                      self.address, exc_info=True)
-                        continue
-                else:
-                    continue
+            _LOGGER.debug("%s: Connected; RSSI: %s", self.address, self.rssi)
+            
+            self._client = client
+            if self._client is not None:
+                await self._client.start_notify(
+                    CHARACTERISTIC_NOTIFY, self._notification_handler
+                )
 
-                if self._client and self._client.is_connected:
-                    _LOGGER.debug(
-                        "%s: Sending device info request", self.address)
-                    try:
-                        if not await self._send_packet_while_connected(
-                            TuyaBLECode.FUN_SENDER_DEVICE_INFO,
-                            bytes(0),
-                            0,
-                            True,
-                        ):
-                            self._client = None
-                            _LOGGER.error(
-                                "%s: Sending device info request failed",
-                                self.address,
-                            )
-                            continue
-                    except:  # [BLEAK_EXCEPTIONS, BleakNotFoundError]:
-                        self._client = None
-                        _LOGGER.error("%s: Sending device info request failed",
-                                      self.address, exc_info=True)
-                        continue
-                else:
-                    continue
+    async def _initialize_connection(self) -> None:
+        """Initialize connection after establishing it."""
+        _LOGGER.debug("%s: Sending device info request", self.address)
+        await self._send_packet(TuyaBLECode.FUN_SENDER_DEVICE_INFO, bytes(0))
 
-                if self._client and self._client.is_connected:
-                    _LOGGER.debug("%s: Sending pairing request", self.address)
-                    try:
-                        if not await self._send_packet_while_connected(
-                            TuyaBLECode.FUN_SENDER_PAIR,
-                            self._build_pairing_request(),
-                            0,
-                            True,
-                        ):
-                            self._client = None
-                            _LOGGER.error(
-                                "%s: Sending pairing request failed",
-                                self.address,
-                            )
-                            continue
-                    except:  # [BLEAK_EXCEPTIONS, BleakNotFoundError]:
-                        self._client = None
-                        _LOGGER.error("%s: Sending pairing request failed",
-                                      self.address, exc_info=True)
-                        continue
-                else:
-                    continue
+        _LOGGER.debug("%s: Sending pairing request", self.address)
+        await self._send_packet(TuyaBLECode.FUN_SENDER_PAIR, self._build_pairing_request())
 
-                break
+        # Give device time to send timestamp request and initial datapoints
+        await asyncio.sleep(0.5)
 
-        if self._client:
-            if self._client.is_connected:
-                if self._is_paired:
-                    _LOGGER.debug("%s: Successfully connected", self.address)
-                    self._fire_connected_callbacks()
-                else:
-                    _LOGGER.error("%s: Connected but not paired", self.address)
-            else:
-                _LOGGER.error("%s: Not connected", self.address)
-        else:
-            _LOGGER.error("%s: No client device", self.address)
+        _LOGGER.debug("%s: Sending device status request", self.address)
+        await self._send_packet(TuyaBLECode.FUN_SENDER_DEVICE_STATUS, bytes())
+        
+        _LOGGER.debug("%s: Successfully initialized", self.address)
+        self._fire_connected_callbacks()
 
     async def _reconnect(self) -> None:
         """Attempt a reconnect"""
@@ -680,15 +610,17 @@ class TuyaBLEDevice:
         async with self._seq_num_lock:
             self._current_seq_num = 1
         try:
-            if self._expected_disconnect:
-                return
             await self._ensure_connected()
-            if self._expected_disconnect:
-                return
-            _LOGGER.debug("%s: Reconnect, connection ensured", self.address)
-        except BLEAK_EXCEPTIONS:  # BleakNotFoundError:
+            _LOGGER.debug("%s: Reconnect, initializing", self.address)
+            await self._initialize_connection()
+        except BleakNotFoundError:
+            _LOGGER.debug("%s: failed to ensure connection - backing off", self.address)
+            await asyncio.sleep(BLEAK_BACKOFF_TIME)
+            _LOGGER.debug("%s: reconnecting again", self.address)
+            asyncio.create_task(self._reconnect())
+        except BLEAK_EXCEPTIONS:
             _LOGGER.debug(
-                "%s: Reconnect, failed to ensure connection - backing off",
+                "%s: Reconnect failed - backing off",
                 self.address,
                 exc_info=True,
             )
@@ -900,20 +832,12 @@ class TuyaBLEDevice:
                 )
                 raise
 
-    async def _resend_packets(self, packets: list[bytes]) -> None:
-        if self._expected_disconnect:
-            return
-        await self._ensure_connected()
-        if self._expected_disconnect:
-            return
-        await self._int_send_packet_while_connected(packets)
-
+    @retry_bluetooth_connection_error(DEFAULT_ATTEMPTS)
     async def _send_packets_locked(self, packets: list[bytes]) -> None:
         """Send command to device and read response."""
         try:
             await self._int_send_packets_locked(packets)
         except BleakDBusError as ex:
-            # Disconnect so we can reset state and try again
             await asyncio.sleep(BLEAK_BACKOFF_TIME)
             _LOGGER.debug(
                 "%s: RSSI: %s; Backing off %ss; Disconnecting due to error: %s",
@@ -922,23 +846,16 @@ class TuyaBLEDevice:
                 BLEAK_BACKOFF_TIME,
                 ex,
             )
-            if self._is_paired:
-                asyncio.create_task(self._resend_packets(packets))
-            else:
-                asyncio.create_task(self._reconnect())
-            raise BleakError from ex
+            await self._execute_disconnect()
+            raise
         except BleakError as ex:
-            # Disconnect so we can reset state and try again
             _LOGGER.debug(
                 "%s: RSSI: %s; Disconnecting due to error: %s",
                 self.address,
                 self.rssi,
                 ex,
             )
-            if self._is_paired:
-                asyncio.create_task(self._resend_packets(packets))
-            else:
-                asyncio.create_task(self._reconnect())
+            await self._execute_disconnect()
             raise
 
     async def _int_send_packets_locked(self, packets: list[bytes]) -> None:

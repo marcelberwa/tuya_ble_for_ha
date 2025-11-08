@@ -314,23 +314,46 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
         import asyncio
 
         current_addresses = self._async_current_ids()
+        _LOGGER.debug("Current configured addresses: %s", current_addresses)
 
         # First attempt: Check already discovered devices
         for discovery in async_discovered_service_info(self.hass):
-            if (
-                discovery.address in current_addresses
-                or discovery.address in self._discovered_devices
-                or discovery.service_data is None
-                or not SERVICE_UUID in discovery.service_data.keys()
-            ):
+            _LOGGER.debug(
+                "Scanning device: %s, address: %s, service_data: %s, service_uuids: %s",
+                discovery.name,
+                discovery.address,
+                discovery.service_data,
+                discovery.service_uuids if hasattr(discovery, 'service_uuids') else 'N/A'
+            )
+            
+            if discovery.address in current_addresses:
+                _LOGGER.debug("Device %s already configured, skipping", discovery.address)
                 continue
+            if discovery.address in self._discovered_devices:
+                _LOGGER.debug("Device %s already in discovered list, skipping", discovery.address)
+                continue
+            if discovery.service_data is None:
+                _LOGGER.debug("Device %s has no service_data, skipping", discovery.address)
+                continue
+            if not SERVICE_UUID in discovery.service_data.keys():
+                _LOGGER.debug(
+                    "Device %s missing SERVICE_UUID (%s) in service_data keys: %s",
+                    discovery.address,
+                    SERVICE_UUID,
+                    list(discovery.service_data.keys())
+                )
+                continue
+            
+            _LOGGER.info("Found Tuya BLE device: %s (%s)", discovery.name, discovery.address)
             self._discovered_devices[discovery.address] = discovery
 
         # If we have devices, return early
         if self._discovered_devices:
+            _LOGGER.info("Found %d Tuya BLE device(s) in first scan", len(self._discovered_devices))
             return
 
         # Second attempt: Wait and scan again (allows for intermittent advertising)
+        _LOGGER.debug("No devices found in first scan, waiting 3 seconds for second scan...")
         await asyncio.sleep(3)
         for discovery in async_discovered_service_info(self.hass):
             if (
@@ -340,13 +363,16 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
                 or not SERVICE_UUID in discovery.service_data.keys()
             ):
                 continue
+            _LOGGER.info("Found Tuya BLE device (2nd scan): %s (%s)", discovery.name, discovery.address)
             self._discovered_devices[discovery.address] = discovery
 
         # If we still have devices, return
         if self._discovered_devices:
+            _LOGGER.info("Found %d Tuya BLE device(s) in second scan", len(self._discovered_devices))
             return
 
         # Third attempt: Wait longer and scan again
+        _LOGGER.debug("No devices found in second scan, waiting 5 seconds for third scan...")
         await asyncio.sleep(5)
         for discovery in async_discovered_service_info(self.hass):
             if (
@@ -356,16 +382,25 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
                 or not SERVICE_UUID in discovery.service_data.keys()
             ):
                 continue
+            _LOGGER.info("Found Tuya BLE device (3rd scan): %s (%s)", discovery.name, discovery.address)
             self._discovered_devices[discovery.address] = discovery
+        
+        if self._discovered_devices:
+            _LOGGER.info("Found %d Tuya BLE device(s) in third scan", len(self._discovered_devices))
+        else:
+            _LOGGER.warning("No Tuya BLE devices found after all scan attempts")
 
         # Final fallback: Check cloud cache for registered devices
         if not self._discovered_devices and self._manager:
+            _LOGGER.debug("Checking cloud cache for registered devices...")
             from .cloud import _cache
             for cache_item in _cache.values():
                 if cache_item.credentials:
+                    _LOGGER.debug("Found %d devices in cloud cache", len(cache_item.credentials))
                     # Add cloud devices to discovered devices list
                     for mac_address, device_data in cache_item.credentials.items():
                         if mac_address not in current_addresses:
+                            _LOGGER.info("Adding cloud-registered device: %s", mac_address)
                             # Create a fake discovery info for cloud devices
                             # This allows users to configure cloud-registered devices
                             # even if they're not currently discoverable via Bluetooth
@@ -374,6 +409,10 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
                                 'name': device_data.get(CONF_DEVICE_NAME, 'Unknown Device'),
                                 'rssi': None,
                             })()
+            if self._discovered_devices:
+                _LOGGER.info("Found %d device(s) from cloud cache", len(self._discovered_devices))
+            else:
+                _LOGGER.debug("No devices found in cloud cache")
 
     async def _show_device_form(self, errors: dict[str, str]) -> FlowResult:
         """Show the device selection form with manual MAC entry option."""
