@@ -311,6 +311,7 @@ mapping: dict[str, TuyaBLECategorySwitchMapping] = {
                     dp_id=110,
                     description=SwitchEntityDescription(
                         key="window_detection",
+                        translation_key="window_detection",
                         icon="mdi:window-open-variant",
                         entity_category=EntityCategory.CONFIG,
                     ),
@@ -319,6 +320,7 @@ mapping: dict[str, TuyaBLECategorySwitchMapping] = {
                     dp_id=108,
                     description=SwitchEntityDescription(
                         key="rapid_mode",
+                        translation_key="rapid_mode",
                         icon="mdi:fire",
                         entity_category=EntityCategory.CONFIG,
                     ),
@@ -327,6 +329,7 @@ mapping: dict[str, TuyaBLECategorySwitchMapping] = {
                     dp_id=113,
                     description=SwitchEntityDescription(
                         key="dormancy_mode",
+                        translation_key="dormancy_mode",
                         icon="mdi:sleep",
                         entity_category=EntityCategory.CONFIG,
                     ),

@@ -301,8 +301,20 @@ class TuyaBLEClimate(TuyaBLEEntity, ClimateEntity):
             int_value = int(
                 kwargs["temperature"] * self._mapping.target_temperature_coefficient
             )
+            
+            # For hkdvdvef (BT Radiator Thermostat): in auto mode, use DP107 instead of DP2
+            target_dp_id = self._mapping.target_temperature_dp_id
+            if (
+                self._device.product_id == "hkdvdvef"
+                and self._mapping.hvac_mode_dp_id == 4
+            ):
+                # Get current mode from DP4
+                mode_datapoint = self._device.datapoints[4]
+                if mode_datapoint and mode_datapoint.value == 0:  # 0 = AUTO mode
+                    target_dp_id = 107  # Use auto_temperature DP instead
+            
             datapoint = self._device.datapoints.get_or_create(
-                self._mapping.target_temperature_dp_id,
+                target_dp_id,
                 TuyaBLEDataPointType.DT_VALUE,
                 int_value,
             )

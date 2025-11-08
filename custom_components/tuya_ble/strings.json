@@ -201,6 +201,15 @@
       "window_check": {
         "name": "Window Check"
       },
+      "window_detection": {
+        "name": "Window Detection"
+      },
+      "rapid_mode": {
+        "name": "Rapid Mode"
+      },
+      "dormancy_mode": {
+        "name": "Dormancy Mode"
+      },
       "water_scale_proof": {
         "name": "Anti-scale"
       },

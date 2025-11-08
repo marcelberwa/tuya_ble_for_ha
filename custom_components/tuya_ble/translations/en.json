@@ -75,6 +75,27 @@
             },
             "up_position": {
                 "name": "Up position"
+            },
+            "temperature_calibration": {
+                "name": "Temperature Calibration"
+            },
+            "comfort_temperature": {
+                "name": "Comfort Temperature"
+            },
+            "eco_temperature": {
+                "name": "Eco Temperature"
+            },
+            "auto_temperature": {
+                "name": "Auto Temperature"
+            },
+            "window_temperature": {
+                "name": "Window Temperature"
+            },
+            "window_detection_time": {
+                "name": "Window Detection Time"
+            },
+            "rapid_mode_duration": {
+                "name": "Rapid Mode Duration"
             }
         },
         "select": {
@@ -212,6 +233,15 @@
             },
             "window_check": {
                 "name": "Window Check"
+            },
+            "window_detection": {
+                "name": "Window Detection"
+            },
+            "rapid_mode": {
+                "name": "Rapid Mode"
+            },
+            "dormancy_mode": {
+                "name": "Dormancy Mode"
             }
         },
         "text": {
