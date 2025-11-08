@@ -290,6 +290,11 @@ class TuyaBLEDevice:
 
     async def update(self) -> None:
         _LOGGER.debug("%s: Updating", self.address)
+        # Ensure device is initialized before sending status request
+        if not self._is_paired:
+            _LOGGER.debug("%s: Device not paired, initializing first", self.address)
+            await self._ensure_connected()
+            await self._initialize_connection()
         await self._send_packet(TuyaBLECode.FUN_SENDER_DEVICE_STATUS, bytes())
 
     async def _update_device_info(self) -> bool:
@@ -687,6 +692,13 @@ class TuyaBLEDevice:
             security_flag = b"\x04"
         else:
             key = self._session_key
+            if key is None:
+                _LOGGER.error(
+                    "%s: Session key is None, device not properly initialized. "
+                    "Device info exchange may have failed.",
+                    self.address
+                )
+                raise TuyaBLEDeviceError(0)
             security_flag = b"\x05"
 
         raw = bytearray()
@@ -742,6 +754,17 @@ class TuyaBLEDevice:
         await self._ensure_connected()
         if self._expected_disconnect:
             return
+        
+        # If sending non-initialization packets, ensure device is paired first
+        if code != TuyaBLECode.FUN_SENDER_DEVICE_INFO and code != TuyaBLECode.FUN_SENDER_PAIR:
+            if not self._is_paired:
+                _LOGGER.warning(
+                    "%s: Attempting to send packet %s but device not paired, initializing first",
+                    self.address,
+                    code.name
+                )
+                await self._initialize_connection()
+        
         await self._send_packet_while_connected(code, data, 0, wait_for_response)
 
     async def _send_response(
