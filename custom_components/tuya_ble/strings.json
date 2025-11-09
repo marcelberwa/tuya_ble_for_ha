@@ -91,6 +91,9 @@
       },
       "rapid_mode_duration": {
         "name": "Rapid Mode Duration"
+      },
+      "holiday_temperature": {
+        "name": "Holiday Temperature"
       }
     },
     "select": {

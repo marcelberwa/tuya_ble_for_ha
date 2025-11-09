@@ -468,6 +468,21 @@ mapping: dict[str, TuyaBLECategoryNumberMapping] = {
                         entity_category=EntityCategory.CONFIG,
                     ),
                 ),
+                # Holiday mode helper entities (non-DP, used for UI configuration)
+                TuyaBLENumberMapping(
+                    dp_id=-103,  # Virtual DP for holiday temperature
+                    description=NumberEntityDescription(
+                        key="holiday_temperature",
+                        translation_key="holiday_temperature",
+                        icon="mdi:thermometer-low",
+                        native_max_value=29.5,
+                        native_min_value=0.5,
+                        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+                        native_step=0.5,
+                        entity_category=EntityCategory.CONFIG,
+                    ),
+                    coefficient=2.0,
+                ),
             ],
         },
     ),

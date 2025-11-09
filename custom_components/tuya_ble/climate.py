@@ -138,19 +138,19 @@ mapping: dict[str, TuyaBLECategoryClimateMapping] = {
                 # - [x] 4   - Mode (auto/manual/holiday)
                 # - [x] 7   - Child lock
                 # - [ ] 13  - Fault status (bitmap)
-                # - [ ] 21  - Battery voltage
-                # - [ ] 101 - Comfort temperature
-                # - [ ] 102 - Eco temperature
+                # - [x] 21  - Battery voltage
+                # - [x] 101 - Comfort temperature
+                # - [x] 102 - Eco temperature
                 # - [ ] 103 - Holiday configuration (raw)
-                # - [ ] 105 - Temperature calibration (temp_drift)
-                # - [ ] 107 - Auto mode temperature
-                # - [ ] 108 - Rapid mode
+                # - [x] 105 - Temperature calibration (temp_drift)
+                # - [x] 107 - Auto mode temperature
+                # - [x] 108 - Rapid mode
                 # - [x] 110 - Window detection status
-                # - [ ] 113 - Dormancy mode
+                # - [x] 113 - Dormancy mode
                 # - [ ] 114-120 - Weekly schedule (raw)
-                # - [ ] 121 - Window temperature
-                # - [ ] 122 - Window time
-                # - [ ] 123 - Rapid duration
+                # - [x] 121 - Window temperature
+                # - [x] 122 - Window time
+                # - [x] 123 - Rapid duration
                 # - [x] 124 - Heating state
                 TuyaBLEClimateMapping(
                     description=ClimateEntityDescription(

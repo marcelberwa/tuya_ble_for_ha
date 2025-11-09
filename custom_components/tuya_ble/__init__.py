@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import voluptuous as vol
 
 from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS as BLEAK_EXCEPTIONS, get_device
 
@@ -17,6 +18,7 @@ from .tuya_ble import TuyaBLEDevice
 from .cloud import HASSTuyaBLEDeviceManager
 from .const import DOMAIN
 from .devices import TuyaBLECoordinator, TuyaBLEData, get_device_product_info
+from .holiday import HolidayModeHelper
 
 PLATFORMS: list[Platform] = [
     Platform.BUTTON,
@@ -96,6 +98,48 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_stop)
     )
+    
+    # Register holiday mode service
+    async def handle_set_holiday_mode(call):
+        """Handle set_holiday_mode service call."""
+        device_id = call.data.get("device_id")
+        temperature = call.data.get("temperature")
+        start_date = call.data.get("start_date")
+        end_date = call.data.get("end_date")
+        start_hour = call.data.get("start_hour", 0)
+        start_minute = call.data.get("start_minute", 0)
+        end_hour = call.data.get("end_hour", 0)
+        end_minute = call.data.get("end_minute", 0)
+        
+        # Find the device
+        if device.device_id == device_id:
+            await HolidayModeHelper.set_holiday_mode(
+                device=device,
+                temperature=temperature,
+                start_date=start_date,
+                end_date=end_date,
+                start_hour=start_hour,
+                start_minute=start_minute,
+                end_hour=end_hour,
+                end_minute=end_minute,
+            )
+    
+    hass.services.async_register(
+        DOMAIN,
+        "set_holiday_mode",
+        handle_set_holiday_mode,
+        schema=vol.Schema({
+            vol.Required("device_id"): str,
+            vol.Required("temperature"): vol.Range(min=0.5, max=29.5),
+            vol.Required("start_date"): str,  # YYYY-MM-DD
+            vol.Required("end_date"): str,    # YYYY-MM-DD
+            vol.Optional("start_hour", default=0): vol.Range(min=0, max=23),
+            vol.Optional("start_minute", default=0): vol.Range(min=0, max=59),
+            vol.Optional("end_hour", default=0): vol.Range(min=0, max=23),
+            vol.Optional("end_minute", default=0): vol.Range(min=0, max=59),
+        }),
+    )
+    
     return True
 
 
