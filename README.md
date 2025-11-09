@@ -109,5 +109,5 @@ The integration works locally, but connection to Tuya BLE device requires the en
 Contributions are welcome! Please feel free to submit issues and pull requests to help improve this integration.
 
 <p align="center">
-  <a href="buymeacoffee.com/marcelberwa"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy me an Xilinx FPGA"></a>
+  <a href="https://www.buymeacoffee.com/marcelberwa"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy me an Xilinx FPGA"></a>
 </p>
