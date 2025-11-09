@@ -1,57 +1,112 @@
-# Home Assistant support for Tuya Bluetooth devices
+# Home Assistant Tuya BLE Integration
 
 ## Overview
 
-This integration supports Tuya devices connected via BLE and is an updated version of _[@PlusPlus-ua]_.
+This integration provides local control support for Tuya devices connected via Bluetooth Low Energy (BLE) in Home Assistant. It enables direct communication with Tuya BLE devices using their Tuya IoT cloud credentials.
 
-_Forked code of [@PlusPlus-ua](https://github.com/PlusPlus-ua/ha_tuya_ble)_
-_Inspired by code of [@redphx](https://github.com/redphx/poc-tuya-ble-fingerbot)_
+**Features:**
+- Local control of Tuya BLE devices without cloud dependencies (after initial setup)
+- Automatic device discovery via Bluetooth
+- Support for multiple device categories (climate, sensors, smart locks, fingerbots, and more)
+- Simplified setup requiring only Tuya IoT Access ID, Access Secret, and Region
+- Automatic device matching based on MAC address
+
+_Based on code from [@PlusPlus-ua](https://github.com/PlusPlus-ua/ha_tuya_ble) and [@redphx](https://github.com/redphx/poc-tuya-ble-fingerbot)_
 
 ## Installation
 
 Place the `custom_components` folder in your configuration directory (or add its contents to an existing `custom_components` folder).
 
-## Usage
+Alternatively, add this integration to HACS (Home Assistant Community Store).
 
-After adding to Home Assistant integration should discover all supported Bluetooth devices, or you can add discoverable devices manually.
+## Setup & Configuration
 
-The integration works locally, but connection to Tuya BLE device requires device ID and encryption key from Tuya IOT cloud. It could be obtained using the same credentials as in official Tuya integration. To obtain the credentials, please refer to official Tuya integration [documentation](https://www.home-assistant.io/integrations/tuya/)
+### Prerequisites
 
-## Supported devices list
+To use this integration, you need valid Tuya IoT credentials:
 
-* Fingerbots (category_id 'szjqr')
-  + Fingerbot (product_ids 'ltak7e1p', 'y6kttvd6', 'yrnk7mnn', 'nvr2rocq', 'bnt7wajf', 'rvdceqjh', '5xhbk964'), original device, first in category, powered by CR2 battery.
-  + Adaprox Fingerbot (product_id 'y6kttvd6'), built-in battery with USB type C charging.
-  + Fingerbot Plus (product_ids 'blliqpsj', 'ndvkgsrm', 'yiihr7zh', 'neq16kgd'), almost same as original, has sensor button for manual control.
-  + CubeTouch 1s (product_id '3yqdo5yt'), built-in battery with USB type C charging.
-  + CubeTouch II (product_id 'xhf790if'), built-in battery with USB type C charging.
+1. Go to [Tuya IoT Console](https://iot.tuya.com)
+2. Create a new project or use an existing one
+3. Create an API key with permissions for "Device Control"
+4. Get your **Access ID** and **Access Secret**
+5. Note your **API Region** (CN, EU, US, IN, etc.)
 
-  All features available in Home Assistant, programming (series of actions) is implemented for Fingerbot Plus.
-  For programming exposed entities 'Program' (switch), 'Repeat forever', 'Repeats count', 'Idle position' and 'Program' (text). Format of program text is: 'position\[/time\];...' where position is in percents, optional time is in seconds (zero if missing).
+### Adding Devices
 
-* Temperature and humidity sensors (category_id 'wsdcg')
-  + Soil moisture sensor (product_id 'ojzlzzsw').
+1. Ensure your Tuya BLE device is powered on and in range
+2. In Home Assistant, go to **Settings → Devices & Services → Integrations**
+3. Click **Create Integration** and search for "Tuya BLE"
+4. Home Assistant will automatically discover nearby Tuya BLE devices
+5. When a device is found, enter your **Tuya IoT Access ID**, **Access Secret**, and **Region**
+6. The device will be automatically matched and added to your setup
 
-* CO2 sensors (category_id 'co2bj')
-  + CO2 Detector (product_id '59s19z5m').
+**Note:** You do NOT need to enter the Device ID manually. The integration automatically matches devices based on their MAC address from the Bluetooth discovery.
 
-* Smart Locks (category_id 'ms')
-  + Smart Lock (product_id 'ludzroix', 'isk2p555').
+## Supported Devices
 
-* Climate (category_id 'wk')
-  + Thermostatic Radiator Valve (product_ids 'drlajpqc', 'nhj2j7su', 'hkdvdvef').
+### Fingerbots (category_id 'szjqr')
+  - **Fingerbot** (product_ids 'ltak7e1p', 'y6kttvd6', 'yrnk7mnn', 'nvr2rocq', 'bnt7wajf', 'rvdceqjh', '5xhbk964')
+    - Original device, first in category, powered by CR2 battery
+    - Full programming support with series of actions
+  
+  - **Adaprox Fingerbot** (product_id 'y6kttvd6')
+    - Built-in battery with USB type C charging
+  
+  - **Fingerbot Plus** (product_ids 'blliqpsj', 'ndvkgsrm', 'yiihr7zh', 'neq16kgd')
+    - Similar to original with sensor button for manual control
+    - Advanced programming capabilities (position, repeat count, idle position)
+  
+  - **CubeTouch 1s** (product_id '3yqdo5yt')
+    - Built-in battery with USB type C charging
+  
+  - **CubeTouch II** (product_id 'xhf790if')
+    - Built-in battery with USB type C charging
 
-* Smart water bottle (category_id 'znhsb')
-  + Smart water bottle (product_id 'cdlandip')
+  **Programming Format:** `position[/time];...` where position is in percents (0-100), optional time is in seconds.
 
-* Irrigation computer (category_id 'ggq')
-  + Irrigation computer (product_id '6pahkcau')
+### Temperature & Humidity Sensors (category_id 'wsdcg')
+  - **Soil Moisture Sensor** (product_id 'ojzlzzsw')
 
-## Support project
+### CO2 Sensors (category_id 'co2bj')
+  - **CO2 Detector** (product_id '59s19z5m')
 
-I am working on this integration in Ukraine. Our country was subjected to brutal aggression by Russia. The war still continues. The capital of Ukraine - Kyiv, where I live, and many other cities and villages are constantly under threat of rocket attacks. Our air defense forces are doing wonders, but they also need support. So if you want to help the development of this integration, donate some money and I will spend it to support our air defense.
-<br><br>
+### Smart Locks (category_id 'ms')
+  - **Smart Lock** (product_ids 'ludzroix', 'isk2p555')
+
+### Climate Control (category_id 'wk')
+  - **Thermostatic Radiator Valve** (product_ids 'drlajpqc', 'nhj2j7su', 'hkdvdvef')
+    - Full temperature control support
+    - Heating mode, target temperature, and valve position control
+    - Energy-saving features
+
+### Smart Water Bottles (category_id 'znhsb')
+  - **Smart Water Bottle** (product_id 'cdlandip')
+
+### Irrigation Systems (category_id 'ggq')
+  - **Irrigation Computer** (product_id '6pahkcau')
+
+## Troubleshooting
+
+### Device Not Discovered
+- Ensure your Tuya BLE device is powered on and nearby
+- Check that Bluetooth is enabled in Home Assistant
+- Verify the device is in pairing/discovery mode if needed
+- Try restarting Home Assistant Bluetooth
+
+### Authentication Errors
+- Double-check your Tuya IoT Access ID and Access Secret
+- Verify you're using the correct API Region
+- Ensure your Tuya IoT API credentials have "Device Control" permissions
+
+### No Credentials After Login
+- Verify the device is registered in your Tuya IoT cloud account
+- Check that the device MAC address matches what's discovered
+- Try re-adding the integration
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues and pull requests to help improve this integration.
+
 <p align="center">
   <a href="buymeacoffee.com/marcelberwa"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy me an Xilinx FPGA"></a>
 </p>
-
