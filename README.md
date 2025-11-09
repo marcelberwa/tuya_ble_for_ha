@@ -23,12 +23,13 @@ Alternatively, add this integration to HACS (Home Assistant Community Store).
 
 ### Prerequisites
 
-To use this integration, you need valid Tuya IoT credentials:
+The integration works locally, but connection to Tuya BLE device requires the encryption key from the Tuya IOT cloud. It could be obtained using the same credentials as in official Tuya integration. To obtain the credentials, please refer to official Tuya integration [documentation](https://www.home-assistant.io/integrations/tuya/). In short, these are the steps to take:
 
 1. Go to [Tuya IoT Console](https://iot.tuya.com)
-2. Create a new project or use an existing one
-3. Create an API key with permissions for "Device Control"
-4. Get your **Access ID** and **Access Secret**
+2. Create a new **Cloud Project** or use an existing one
+3. Add the Tuya BLE devices (best via the official Tuya App -> tab **Link App Account**)
+3. Give the devices the permissions for "Device Control"
+4. Get your **Access ID** and **Access Secret** (in the tab **Overview** of the **Cloud Project**)
 5. Note your **API Region** (CN, EU, US, IN, etc.)
 
 ### Adding Devices
