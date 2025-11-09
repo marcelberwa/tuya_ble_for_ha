@@ -19,6 +19,8 @@ Place the `custom_components` folder in your configuration directory (or add its
 
 Alternatively, add this integration to HACS (Home Assistant Community Store).
 
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=marcelberwa&repository=tuya_ble_for_ha&category=integration)
+
 ## Setup & Configuration
 
 ### Prerequisites
