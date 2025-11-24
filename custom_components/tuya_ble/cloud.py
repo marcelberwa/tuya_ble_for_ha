@@ -197,7 +197,7 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                             
                             _LOGGER.debug("Factory info response for device %s: %s", device_id, fi_response)
                             
-                            if fi_response and fi_response.get(TUYA_RESPONSE_SUCCESS):
+                            if fi_response and isinstance(fi_response, dict) and fi_response.get(TUYA_RESPONSE_SUCCESS):
                                 fi_response_result = fi_response.get(TUYA_RESPONSE_RESULT)
                                 if (fi_response_result and 
                                     isinstance(fi_response_result, list) and 
