@@ -195,11 +195,17 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                                 method="GET"
                             )
                             
+                            _LOGGER.debug("Factory info response for device %s: %s", device_id, fi_response)
+                            
                             if fi_response and fi_response.get(TUYA_RESPONSE_SUCCESS):
                                 fi_response_result = fi_response.get(TUYA_RESPONSE_RESULT)
-                                if fi_response_result and len(fi_response_result) > 0:
+                                if (fi_response_result and 
+                                    isinstance(fi_response_result, list) and 
+                                    len(fi_response_result) > 0):
                                     factory_info = fi_response_result[0]
-                                    if factory_info and (TUYA_FACTORY_INFO_MAC in factory_info):
+                                    if (factory_info and 
+                                        isinstance(factory_info, dict) and 
+                                        TUYA_FACTORY_INFO_MAC in factory_info):
                                         mac = ":".join(
                                             factory_info[TUYA_FACTORY_INFO_MAC][i : i + 2]
                                             for i in range(0, 12, 2)
