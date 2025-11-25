@@ -205,7 +205,8 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
             # Use our async API to get devices
             devices_response = await item.api.get_devices()
             
-            _LOGGER.debug("Devices response type: %s, content: %s", type(devices_response), devices_response)
+            #_LOGGER.debug("Devices response type: %s, content: %s", type(devices_response), devices_response)
+            _LOGGER.exception("Devices response type: %s, content: %s", type(devices_response), devices_response)
             
             if isinstance(devices_response, dict) and devices_response.get(TUYA_RESPONSE_SUCCESS):
                 devices = devices_response.get(TUYA_RESPONSE_RESULT, [])
