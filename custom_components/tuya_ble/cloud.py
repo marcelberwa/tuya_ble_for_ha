@@ -183,10 +183,14 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
             # Use our async API to get devices
             devices_response = await item.api.get_devices()
             
-            if devices_response.get(TUYA_RESPONSE_SUCCESS):
+            _LOGGER.debug("Devices response type: %s, content: %s", type(devices_response), devices_response)
+            
+            if isinstance(devices_response, dict) and devices_response.get(TUYA_RESPONSE_SUCCESS):
                 devices = devices_response.get(TUYA_RESPONSE_RESULT, [])
-                if isinstance(devices, Iterable):
+                if isinstance(devices, list):
                     for device in devices:
+                        if not isinstance(device, dict):
+                            continue
                         device_id = device.get("id")
                         if device_id:
                             # Get factory info using cloud_request
@@ -221,8 +225,10 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                                             CONF_PRODUCT_MODEL: device.get("model"),
                                             CONF_PRODUCT_NAME: device.get("product_name"),
                                         }
+            else:
+                _LOGGER.warning("Invalid devices_response type or failed response: %s", devices_response)
         except Exception as e:
-            _LOGGER.error("Failed to fill cache item: %s", str(e))
+            _LOGGER.exception("Failed to fill cache item: %s", str(e))
 
     async def build_cache(self) -> None:
         global _cache
