@@ -205,18 +205,35 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
             # Use our async API to get devices
             devices_response = await item.api.get_devices()
             
-            #_LOGGER.debug("Devices response type: %s, content: %s", type(devices_response), devices_response)
-            _LOGGER.exception("Devices response type: %s, content: %s", type(devices_response), devices_response)
+            _LOGGER.debug("Devices response type: %s, content: %s", type(devices_response), devices_response)
             
             if isinstance(devices_response, dict) and devices_response.get(TUYA_RESPONSE_SUCCESS):
-                devices = devices_response.get(TUYA_RESPONSE_RESULT, [])
+                result = devices_response.get(TUYA_RESPONSE_RESULT, {})
+                
+                # Handle nested devices structure: result can be either a list or dict with 'devices' key
+                if isinstance(result, dict):
+                    devices = result.get("devices", [])
+                elif isinstance(result, list):
+                    devices = result
+                else:
+                    devices = []
+                
+                _LOGGER.debug("Found %d devices to process", len(devices) if isinstance(devices, list) else 0)
+                
                 if isinstance(devices, list):
                     for device in devices:
                         if not isinstance(device, dict):
                             continue
                         device_id = device.get("id")
-                        if device_id:
-                            # Get factory info using cloud_request
+                        device_uuid = device.get("uuid")
+                        
+                        if not device_id or not device_uuid:
+                            continue
+                        
+                        mac = None
+                        
+                        # Try to get MAC from factory info
+                        try:
                             fi_response = await item.api.cloud_request(
                                 TUYA_API_FACTORY_INFO_URL % device_id,
                                 method="GET"
@@ -237,17 +254,30 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                                             factory_info[TUYA_FACTORY_INFO_MAC][i : i + 2]
                                             for i in range(0, 12, 2)
                                         ).upper()
-                                        item.credentials[mac] = {
-                                            CONF_ADDRESS: mac,
-                                            CONF_UUID: device.get("uuid"),
-                                            CONF_LOCAL_KEY: device.get("local_key"),
-                                            CONF_DEVICE_ID: device.get("id"),
-                                            CONF_CATEGORY: device.get("category"),
-                                            CONF_PRODUCT_ID: device.get("product_id"),
-                                            CONF_DEVICE_NAME: device.get("name"),
-                                            CONF_PRODUCT_MODEL: device.get("model"),
-                                            CONF_PRODUCT_NAME: device.get("product_name"),
-                                        }
+                        except Exception as e:
+                            _LOGGER.debug("Failed to get factory info for device %s: %s", device_id, e)
+                        
+                        # Store credentials - use UUID as fallback key if MAC is not available
+                        device_credentials = {
+                            CONF_UUID: device_uuid,
+                            CONF_LOCAL_KEY: device.get("local_key"),
+                            CONF_DEVICE_ID: device_id,
+                            CONF_CATEGORY: device.get("category"),
+                            CONF_PRODUCT_ID: device.get("product_id"),
+                            CONF_DEVICE_NAME: device.get("name"),
+                            CONF_PRODUCT_MODEL: device.get("model"),
+                            CONF_PRODUCT_NAME: device.get("product_name"),
+                        }
+                        
+                        if mac:
+                            # Store by MAC address if available
+                            device_credentials[CONF_ADDRESS] = mac
+                            item.credentials[mac] = device_credentials
+                            _LOGGER.debug("Stored credentials for device %s with MAC %s", device.get("name"), mac)
+                        
+                        # Always store by UUID as well for lookup
+                        item.credentials[device_uuid] = device_credentials
+                        _LOGGER.debug("Stored credentials for device %s with UUID %s", device.get("name"), device_uuid)
             else:
                 _LOGGER.warning("Invalid devices_response type or failed response: %s", devices_response)
         except Exception as e:
@@ -319,6 +349,25 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
 
             if item:
                 credentials = item.credentials.get(address)
+                
+                # If not found by MAC address, try to find by UUID
+                if not credentials:
+                    _LOGGER.debug("Credentials not found by MAC %s, searching by UUID in %d cached devices", 
+                                 address, len(item.credentials))
+                    # Log available keys for debugging
+                    _LOGGER.debug("Available credential keys: %s", list(item.credentials.keys()))
+                    
+                    # Try to find credentials where the UUID matches any stored credentials
+                    for key, cred in item.credentials.items():
+                        if isinstance(cred, dict):
+                            stored_address = cred.get(CONF_ADDRESS)
+                            if stored_address and stored_address.upper() == address.upper():
+                                credentials = cred
+                                _LOGGER.debug("Found credentials by matching stored address")
+                                break
+                    
+                    if not credentials:
+                        _LOGGER.warning("Device with MAC %s not found in Tuya cloud cache", address)
 
         if credentials:
             result = TuyaBLEDeviceCredentials(
