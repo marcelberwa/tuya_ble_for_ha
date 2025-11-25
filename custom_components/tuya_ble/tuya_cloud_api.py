@@ -47,6 +47,14 @@ class TuyaCloudAPI:
         # Set API endpoint based on region
         self.url_host = self._get_url_host(api_region)
     
+    def __del__(self):
+        """Cleanup on deletion."""
+        if self._session and not self._session.closed:
+            _LOGGER.warning(
+                "TuyaCloudAPI session not properly closed, this may cause resource leaks. "
+                "Please use 'async with' or call close() explicitly."
+            )
+    
     def _get_url_host(self, region: str) -> str:
         """Get API endpoint URL for the specified region."""
         region = region.lower()
@@ -74,6 +82,16 @@ class TuyaCloudAPI:
         """Close the aiohttp session."""
         if self._session and not self._session.closed:
             await self._session.close()
+            self._session = None
+    
+    async def __aenter__(self):
+        """Async context manager entry."""
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        await self.close()
+        return False
     
     def _generate_signature(
         self,

@@ -15,7 +15,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 
 from .tuya_ble import TuyaBLEDevice
 
-from .cloud import HASSTuyaBLEDeviceManager
+from .cloud import HASSTuyaBLEDeviceManager, cleanup_cache
 from .const import DOMAIN
 from .devices import TuyaBLECoordinator, TuyaBLEData, get_device_product_info
 from .holiday import HolidayModeHelper
@@ -155,5 +155,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         data: TuyaBLEData = hass.data[DOMAIN].pop(entry.entry_id)
         await data.device.stop()
+        
+        # Clean up cloud API sessions if this is the last entry
+        if not hass.data[DOMAIN]:
+            await cleanup_cache()
 
     return unload_ok

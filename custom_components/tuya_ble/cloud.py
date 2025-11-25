@@ -78,6 +78,16 @@ CONF_TUYA_DEVICE_KEYS = [
 _cache: dict[str, TuyaCloudCacheItem] = {}
 
 
+async def cleanup_cache() -> None:
+    """Clean up cache and close all API sessions."""
+    global _cache
+    for cache_item in _cache.values():
+        if cache_item.api:
+            await cache_item.api.close()
+    _cache.clear()
+    _LOGGER.debug("Cache cleaned up and all API sessions closed")
+
+
 class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
     """Cloud connected manager of the Tuya BLE devices credentials."""
 
@@ -141,11 +151,20 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                     cache_key = self._get_cache_key(data)
                     cache_item = _cache.get(cache_key)
                     if cache_item:
+                        # Close old API session if exists
+                        if cache_item.api:
+                            await cache_item.api.close()
                         cache_item.api = api
                         cache_item.login = data
                     else:
                         _cache[cache_key] = TuyaCloudCacheItem(api, data, {})
+                else:
+                    # If not caching, make sure to note this session needs cleanup
+                    # It will be closed when get_device_credentials completes
+                    pass
             else:
+                # Login failed - close the API session
+                await api.close()
                 error_msg = "Authentication failed"
                 error_code = None
                 if api.error:
@@ -163,6 +182,9 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                 
         except Exception as e:
             _LOGGER.error("Login failed with exception: %s", str(e))
+            # Close API session on exception
+            if 'api' in locals():
+                await api.close()
             response = {
                 TUYA_RESPONSE_SUCCESS: False, 
                 "msg": str(e),
