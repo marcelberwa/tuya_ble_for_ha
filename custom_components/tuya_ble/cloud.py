@@ -350,24 +350,30 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
             if item:
                 credentials = item.credentials.get(address)
                 
-                # If not found by MAC address, try to find by UUID
+                # If not found by MAC address, try to find by matching stored address in credentials
                 if not credentials:
-                    _LOGGER.debug("Credentials not found by MAC %s, searching by UUID in %d cached devices", 
+                    _LOGGER.debug("Credentials not found by direct MAC lookup %s, searching in %d cached devices", 
                                  address, len(item.credentials))
                     # Log available keys for debugging
                     _LOGGER.debug("Available credential keys: %s", list(item.credentials.keys()))
                     
-                    # Try to find credentials where the UUID matches any stored credentials
+                    # Try to find credentials where the stored address matches
                     for key, cred in item.credentials.items():
                         if isinstance(cred, dict):
                             stored_address = cred.get(CONF_ADDRESS)
-                            if stored_address and stored_address.upper() == address.upper():
-                                credentials = cred
-                                _LOGGER.debug("Found credentials by matching stored address")
-                                break
+                            stored_name = cred.get(CONF_DEVICE_NAME, "unknown")
+                            if stored_address:
+                                _LOGGER.debug("Comparing MAC %s with stored address %s for device %s", 
+                                            address, stored_address, stored_name)
+                                if stored_address.upper() == address.upper():
+                                    credentials = cred
+                                    _LOGGER.info("Found credentials for MAC %s (device: %s)", address, stored_name)
+                                    break
                     
                     if not credentials:
-                        _LOGGER.warning("Device with MAC %s not found in Tuya cloud cache", address)
+                        _LOGGER.warning("Device with MAC %s not found in Tuya cloud cache. Available devices: %s", 
+                                      address, 
+                                      {k: v.get(CONF_DEVICE_NAME, 'unknown') for k, v in item.credentials.items() if isinstance(v, dict)})
 
         if credentials:
             result = TuyaBLEDeviceCredentials(

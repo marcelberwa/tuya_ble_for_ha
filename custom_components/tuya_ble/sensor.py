@@ -329,7 +329,7 @@ mapping: dict[str, TuyaBLECategorySensorMapping] = {
                         key="heating_state",
                         icon="mdi:radiator",
                         device_class=SensorDeviceClass.ENUM,
-                        options=["off", "heating"],
+                        options=["False", "True", "off", "heating"],
                         entity_category=EntityCategory.DIAGNOSTIC,
                     ),
                 ),
