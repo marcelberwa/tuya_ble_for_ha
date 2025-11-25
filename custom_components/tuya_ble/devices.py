@@ -339,11 +339,17 @@ async def get_device_readable_name(
                 credentials.category,
                 credentials.product_id,
             )
+    
+    # Use the device name from Tuya Cloud if available
+    if credentials and credentials.device_name:
+        return credentials.device_name
+    
+    # Fallback to product info with short address
     short_address = get_short_address(discovery_info.address)
     if product_info:
         return "%s %s" % (product_info.name, short_address)
-    if credentials:
-        return "%s %s" % (credentials.device_name, short_address)
+    
+    # Final fallback to BLE discovery name
     return "%s %s" % (discovery_info.device.name, short_address)
 
 
