@@ -329,9 +329,10 @@ mapping: dict[str, TuyaBLECategorySensorMapping] = {
                         key="heating_state",
                         icon="mdi:radiator",
                         device_class=SensorDeviceClass.ENUM,
-                        options=["False", "True", "off", "heating"],
+                        options=["off", "heating"],
                         entity_category=EntityCategory.DIAGNOSTIC,
                     ),
+                    getter=heating_state_getter,
                 ),
             ],
         },
@@ -341,6 +342,17 @@ mapping: dict[str, TuyaBLECategorySensorMapping] = {
 
 def rssi_getter(sensor: TuyaBLESensor) -> None:
     sensor._attr_native_value = sensor._device.rssi
+
+
+def heating_state_getter(sensor: TuyaBLESensor) -> None:
+    """Convert boolean heating state to enum string."""
+    datapoint = sensor._device.datapoints.get(124)
+    if datapoint:
+        # Convert boolean to string for enum sensor
+        if isinstance(datapoint.value, bool):
+            sensor._attr_native_value = "heating" if datapoint.value else "off"
+        else:
+            sensor._attr_native_value = str(datapoint.value)
 
 
 rssi_mapping = TuyaBLESensorMapping(

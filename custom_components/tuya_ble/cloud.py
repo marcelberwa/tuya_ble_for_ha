@@ -351,10 +351,10 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                 credentials = item.credentials.get(address)
                 
                 # If not found by MAC address, try to find by matching stored address in credentials
+                # Also try to match if this MAC was previously associated with a device
                 if not credentials:
                     _LOGGER.debug("Credentials not found by direct MAC lookup %s, searching in %d cached devices", 
                                  address, len(item.credentials))
-                    # Log available keys for debugging
                     _LOGGER.debug("Available credential keys: %s", list(item.credentials.keys()))
                     
                     # Try to find credentials where the stored address matches
@@ -369,6 +369,16 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                                     credentials = cred
                                     _LOGGER.info("Found credentials for MAC %s (device: %s)", address, stored_name)
                                     break
+                    
+                    # If still not found and we have existing data with UUID, try to match by UUID
+                    if not credentials and CONF_UUID in self._data:
+                        device_uuid = self._data.get(CONF_UUID)
+                        credentials = item.credentials.get(device_uuid)
+                        if credentials:
+                            _LOGGER.info("Found credentials by UUID %s for MAC %s", device_uuid, address)
+                            # Update the credentials cache to also use this MAC
+                            credentials[CONF_ADDRESS] = address
+                            item.credentials[address] = credentials
                     
                     if not credentials:
                         _LOGGER.warning("Device with MAC %s not found in Tuya cloud cache. Available devices: %s", 
