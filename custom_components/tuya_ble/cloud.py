@@ -127,6 +127,23 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
             return {}
 
         try:
+            # Check if we already have a valid cached API for these credentials
+            if add_to_cache:
+                cache_key = self._get_cache_key(data)
+                cache_item = _cache.get(cache_key)
+                if cache_item and cache_item.api:
+                    # Try to reuse existing API if it's still valid
+                    try:
+                        token = await cache_item.api.get_token()
+                        if token:
+                            _LOGGER.debug("Reusing existing API session for %s", data[CONF_ACCESS_ID][:8] + "...")
+                            return {TUYA_RESPONSE_SUCCESS: True, "result": {"access_token": token}}
+                    except Exception as e:
+                        _LOGGER.debug("Existing API session invalid, creating new one: %s", e)
+                        # Close the invalid session
+                        await cache_item.api.close()
+                        cache_item.api = None
+            
             # Create TuyaCloudAPI instance - this is async now
             region = data.get(CONF_REGION, "eu")
             api = TuyaCloudAPI(
@@ -151,17 +168,16 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                     cache_key = self._get_cache_key(data)
                     cache_item = _cache.get(cache_key)
                     if cache_item:
-                        # Close old API session if exists
-                        if cache_item.api:
-                            await cache_item.api.close()
+                        # Update the API reference (might be the same or new)
                         cache_item.api = api
                         cache_item.login = data
                     else:
                         _cache[cache_key] = TuyaCloudCacheItem(api, data, {})
                 else:
-                    # If not caching, make sure to note this session needs cleanup
-                    # It will be closed when get_device_credentials completes
-                    pass
+                    # If not caching, close the session immediately after successful login
+                    # The caller should use add_to_cache=True if they need to keep the session
+                    await api.close()
+                    _LOGGER.debug("Login successful but not cached, session closed")
             else:
                 # Login failed - close the API session
                 await api.close()
@@ -348,12 +364,13 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                         await self._fill_cache_item(item)
 
             if item:
+                _LOGGER.debug("Looking up credentials for MAC address: %s (normalized: %s)", address, address.upper())
                 credentials = item.credentials.get(address)
                 
                 # If not found by MAC address, try to find by matching stored address in credentials
                 # Also try to match if this MAC was previously associated with a device
                 if not credentials:
-                    _LOGGER.debug("Credentials not found by direct MAC lookup %s, searching in %d cached devices", 
+                    _LOGGER.debug("Credentials not found by direct MAC lookup '%s', searching in %d cached devices", 
                                  address, len(item.credentials))
                     _LOGGER.debug("Available credential keys: %s", list(item.credentials.keys()))
                     

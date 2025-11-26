@@ -30,7 +30,7 @@
                     "tuya_device_id": "Device ID (any registered device)",
                     "region": "API Region"
                 },
-                "description": "Tuya BLE requires obtaining encryption key from Tuya cloud. Almost all devices only need to access the cloud once during setup.\n\nRefer to documentation of Tuya integration to retrive the cloud credentials https://www.home-assistant.io/integrations/tuya/\n\nEnter your Tuya IoT Platform credentials (API Key and Secret only)."
+                "description": "Discovered Device:\n• Name: {device_name}\n• MAC: {mac_address}\n• BLE Name: {ble_name}\n• Signal: {rssi} dBm\n\nTuya BLE requires obtaining encryption key from Tuya cloud. Almost all devices only need to access the cloud once during setup.\n\nRefer to documentation of Tuya integration to retrive the cloud credentials https://www.home-assistant.io/integrations/tuya/\n\nEnter your Tuya IoT Platform credentials (API Key and Secret only)."
             }
         }
     },

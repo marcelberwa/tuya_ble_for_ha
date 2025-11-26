@@ -290,11 +290,14 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
                 user_input.update(self._data)
 
         # Add device name/MAC to placeholders
-        placeholders["device_name"] = await get_device_readable_name(
+        device_name = await get_device_readable_name(
             self._discovery_info,
             self._manager,
         )
+        placeholders["device_name"] = device_name
         placeholders["mac_address"] = self._discovery_info.address
+        placeholders["ble_name"] = self._discovery_info.device.name if self._discovery_info.device.name else "Unknown"
+        placeholders["rssi"] = str(self._discovery_info.rssi) if self._discovery_info.rssi else "N/A"
 
         return _show_login_form(self, user_input, errors, placeholders, show_device_id=False)
 

@@ -75,6 +75,9 @@ class TuyaCloudAPI:
     def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
         if self._session is None or self._session.closed:
+            # Force create a new session if the old one was closed
+            if self._session and self._session.closed:
+                self._session = None
             self._session = aiohttp.ClientSession()
         return self._session
     

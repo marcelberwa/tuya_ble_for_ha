@@ -1,0 +1,80 @@
+set_holiday_mode:
+  name: Set Holiday Mode
+  description: Set holiday mode for a Tuya BLE radiator thermostat with temperature and date range.
+  fields:
+    device_id:
+      name: Device ID
+      description: The Tuya device ID of the thermostat
+      required: true
+      example: "bf1234567890abcdef"
+      selector:
+        text:
+    temperature:
+      name: Temperature
+      description: Target temperature in Celsius during holiday mode
+      required: true
+      example: 15.5
+      selector:
+        number:
+          min: 0.5
+          max: 29.5
+          step: 0.5
+          unit_of_measurement: "°C"
+    start_date:
+      name: Start Date
+      description: Start date of holiday mode (YYYY-MM-DD)
+      required: true
+      example: "2025-12-24"
+      selector:
+        text:
+    end_date:
+      name: End Date
+      description: End date of holiday mode (YYYY-MM-DD)
+      required: true
+      example: "2025-12-31"
+      selector:
+        text:
+    start_hour:
+      name: Start Hour
+      description: Hour when holiday mode starts (0-23)
+      required: false
+      default: 0
+      example: 8
+      selector:
+        number:
+          min: 0
+          max: 23
+          step: 1
+    start_minute:
+      name: Start Minute
+      description: Minute when holiday mode starts (0-59)
+      required: false
+      default: 0
+      example: 0
+      selector:
+        number:
+          min: 0
+          max: 59
+          step: 1
+    end_hour:
+      name: End Hour
+      description: Hour when holiday mode ends (0-23)
+      required: false
+      default: 0
+      example: 18
+      selector:
+        number:
+          min: 0
+          max: 23
+          step: 1
+    end_minute:
+      name: End Minute
+      description: Minute when holiday mode ends (0-59)
+      required: false
+      default: 0
+      example: 0
+      selector:
+        number:
+          min: 0
+          max: 59
+          step: 1

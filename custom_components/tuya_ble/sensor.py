@@ -101,7 +101,7 @@ def battery_enum_getter(self: TuyaBLESensor) -> None:
 
 def heating_state_getter(sensor: TuyaBLESensor) -> None:
     """Convert boolean heating state to enum string."""
-    datapoint = sensor._device.datapoints.get(124)
+    datapoint = sensor._device.datapoints[124]
     if datapoint:
         # Convert boolean to string for enum sensor
         if isinstance(datapoint.value, bool):
