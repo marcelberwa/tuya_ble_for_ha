@@ -99,6 +99,17 @@ def battery_enum_getter(self: TuyaBLESensor) -> None:
         self._attr_native_value = datapoint.value * 20.0
 
 
+def heating_state_getter(sensor: TuyaBLESensor) -> None:
+    """Convert boolean heating state to enum string."""
+    datapoint = sensor._device.datapoints.get(124)
+    if datapoint:
+        # Convert boolean to string for enum sensor
+        if isinstance(datapoint.value, bool):
+            sensor._attr_native_value = "heating" if datapoint.value else "off"
+        else:
+            sensor._attr_native_value = str(datapoint.value)
+
+
 @dataclass
 class TuyaBLECategorySensorMapping:
     products: dict[str, list[TuyaBLESensorMapping]] | None = None
@@ -342,17 +353,6 @@ mapping: dict[str, TuyaBLECategorySensorMapping] = {
 
 def rssi_getter(sensor: TuyaBLESensor) -> None:
     sensor._attr_native_value = sensor._device.rssi
-
-
-def heating_state_getter(sensor: TuyaBLESensor) -> None:
-    """Convert boolean heating state to enum string."""
-    datapoint = sensor._device.datapoints.get(124)
-    if datapoint:
-        # Convert boolean to string for enum sensor
-        if isinstance(datapoint.value, bool):
-            sensor._attr_native_value = "heating" if datapoint.value else "off"
-        else:
-            sensor._attr_native_value = str(datapoint.value)
 
 
 rssi_mapping = TuyaBLESensorMapping(
