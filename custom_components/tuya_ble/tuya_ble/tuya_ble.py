@@ -1191,6 +1191,7 @@ class TuyaBLEDevice:
                 self._input_expected_packet_num,
             )
             self._clean_input()
+            return
 
         if packet_num == self._input_expected_packet_num:
             if packet_num == 0:
